@@ -1,0 +1,225 @@
+name: build
+
+# 触发方式：
+#   * push 到 main / master        → 只构建 + 上传 artifact
+#   * push tag（v1.2.3）           → 构建 + 发布 GitHub Release（便携版 + 安装包）
+#   * pull_request                 → 只验证能编译
+#   * 手动 workflow_dispatch       → 可选是否发布
+on:
+  push:
+    branches: [main, master]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+  APP_NAME: PixPin-RS
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Windows：唯一完整可用的平台
+  # ---------------------------------------------------------------------------
+  windows:
+    name: Windows x64
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 安装 Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: windows
+
+      - name: 读取版本号
+        id: version
+        shell: pwsh
+        run: |
+          $v = (Select-String -Path Cargo.toml -Pattern '^version\s*=\s*"(.+)"' |
+                Select-Object -First 1).Matches.Groups[1].Value
+          "version=$v" >> $env:GITHUB_OUTPUT
+          Write-Host "version = $v"
+
+      - name: 编译
+        run: cargo build --release --locked
+
+      - name: 组装便携版目录
+        shell: pwsh
+        run: |
+          $root = "dist/$env:APP_NAME"
+          New-Item -ItemType Directory -Force -Path $root, "$root/models" | Out-Null
+          Copy-Item target/release/pixpin-rs.exe "$root/$env:APP_NAME.exe"
+          Copy-Item models/* "$root/models/"
+          Copy-Item docs/使用说明.txt $root/
+
+          # 便携模式标记：有它就把截图存到 exe 旁边的 screenshots\
+          Set-Content -Path "$root/portable.txt" -Value "portable" -NoNewline
+
+          # 随包 VC 运行库，免得用户还要装 VC++
+          foreach ($dll in "msvcp140.dll","msvcp140_1.dll","vcruntime140.dll","vcruntime140_1.dll") {
+            Copy-Item "C:/Windows/System32/$dll" $root
+          }
+
+          Get-ChildItem $root | Format-Table Name, Length
+
+      - name: 打包便携版 zip
+        shell: pwsh
+        run: |
+          $zip = "dist/$env:APP_NAME-portable-v${{ steps.version.outputs.version }}.zip"
+          if (Test-Path $zip) { Remove-Item $zip -Force }
+          Compress-Archive -Path "dist/$env:APP_NAME" -DestinationPath $zip -CompressionLevel Optimal
+          Get-Item $zip | Format-List Name, Length
+
+      - name: 安装 NSIS
+        run: choco install nsis -y --no-progress
+
+      - name: 生成安装包
+        shell: pwsh
+        run: |
+          $env:PATH += ";C:\Program Files (x86)\NSIS"
+          # makensis 默认会把工作目录切到脚本所在目录，所以这里必须传绝对路径
+          $src = (Resolve-Path "dist/$env:APP_NAME").Path
+          $out = Join-Path (Resolve-Path "dist").Path "$env:APP_NAME-Setup-v${{ steps.version.outputs.version }}.exe"
+          makensis /V2 `
+            /DVERSION=${{ steps.version.outputs.version }} `
+            /DSRCDIR=$src `
+            /DOUTFILE=$out `
+            installer\pixpin.nsi
+          if (-not (Test-Path $out)) { throw "安装包没有生成：$out" }
+          Get-Item $out | Format-List Name, Length
+
+      - name: 冒烟测试（便携版能跑起来）
+        shell: pwsh
+        run: |
+          $exe = "dist/$env:APP_NAME/$env:APP_NAME.exe"
+          $where = & $exe --where
+          $where
+          if ($where -notmatch "screenshots") { throw "便携模式没有生效" }
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pixpin-rs-windows
+          path: |
+            dist/*.zip
+            dist/*-Setup-*.exe
+          if-no-files-found: error
+
+      - name: 发布 Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/*.zip
+            dist/*-Setup-*.exe
+          generate_release_notes: true
+
+  # ---------------------------------------------------------------------------
+  # macOS / Linux：默认关闭
+  #
+  # platform/ 整个目录是 Win32 实现（GDI 抓屏、Shell_NotifyIconW 托盘、
+  # RegisterHotKey 热键、EnumWindows 窗口吸附），换平台等于重写这一层。
+  # UI 层用的 GPUI 本身支持三平台，所以移植是可行的，但需要先替换：
+  #   抓屏   GDI            → xcap
+  #   托盘   Shell_NotifyIconW → tray-icon
+  #   热键   RegisterHotKey → global-hotkey
+  #   窗口   各 Win32 调用   → 平台原生 API
+  #
+  # 移植完成后在仓库 Settings → Variables 里加 ENABLE_UNIX_BUILDS=true 即可启用。
+  # 现在打开会编译失败（windows crate 只在 Windows 上可用）。
+  # ---------------------------------------------------------------------------
+  macos:
+    name: macOS（未移植，默认关闭）
+    if: vars.ENABLE_UNIX_BUILDS == 'true'
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: macos
+      - name: 编译
+        run: cargo build --release --locked
+      - name: 组装 .app
+        run: |
+          APP="dist/PixPin-RS.app"
+          mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
+          cp target/release/pixpin-rs "$APP/Contents/MacOS/PixPin-RS"
+          cp -r models "$APP/Contents/Resources/models"
+          cat > "$APP/Contents/Info.plist" <<'PLIST'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+            <key>CFBundleName</key><string>PixPin-RS</string>
+            <key>CFBundleIdentifier</key><string>dev.pixpin.rs</string>
+            <key>CFBundleExecutable</key><string>PixPin-RS</string>
+            <key>CFBundlePackageType</key><string>APPL</string>
+            <key>CFBundleShortVersionString</key><string>0.0.0</string>
+            <key>LSUIElement</key><true/>
+          </dict></plist>
+          PLIST
+      - name: 打 dmg
+        run: |
+          hdiutil create -volname "PixPin-RS" -srcfolder "dist/PixPin-RS.app" \
+            -ov -format UDZO "dist/PixPin-RS-v0.0.0.dmg"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pixpin-rs-macos
+          path: dist/*.dmg
+          if-no-files-found: error
+
+  linux:
+    name: Linux（未移植，默认关闭）
+    if: vars.ENABLE_UNIX_BUILDS == 'true'
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: 安装 GPUI 需要的系统库
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libwayland-dev libxkbcommon-dev libxkbcommon-x11-dev \
+            libx11-xcb-dev libvulkan-dev libasound2-dev
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: linux
+      - name: 编译
+        run: cargo build --release --locked
+      - name: 便携 tar.gz
+        run: |
+          mkdir -p dist/PixPin-RS
+          cp target/release/pixpin-rs dist/PixPin-RS/
+          cp -r models dist/PixPin-RS/
+          tar -C dist -czf dist/PixPin-RS-linux-x86_64.tar.gz PixPin-RS
+      - name: 打 deb
+        run: |
+          PKG=dist/deb/pixpin-rs
+          mkdir -p "$PKG/DEBIAN" "$PKG/usr/bin" "$PKG/usr/share/pixpin-rs/models" \
+                   "$PKG/usr/share/icons/hicolor/256x256/apps"
+          cp target/release/pixpin-rs "$PKG/usr/bin/pixpin-rs"
+          cp models/* "$PKG/usr/share/pixpin-rs/models/"
+          cp assets/icons/icon.png "$PKG/usr/share/icons/hicolor/256x256/apps/pixpin-rs.png"
+          cat > "$PKG/DEBIAN/control" <<'CTRL'
+          Package: pixpin-rs
+          Version: 0.0.0
+          Section: graphics
+          Priority: optional
+          Architecture: amd64
+          Maintainer: PixPin-RS
+          Description: Screenshot, annotation and OCR tool built with Rust + GPUI.
+          CTRL
+          dpkg-deb --build "$PKG" dist/PixPin-RS-linux-amd64.deb
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pixpin-rs-linux
+          path: |
+            dist/*.tar.gz
+            dist/*.deb
+          if-no-files-found: error

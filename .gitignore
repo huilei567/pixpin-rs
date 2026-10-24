@@ -1,0 +1,19 @@
+# 构建产物
+/target
+/dist
+
+# 运行期生成
+pixpin-trace.log
+*.log
+# 便携版的截图目录（只在仓库根，assets/screenshots 是要提交的）
+/screenshots/
+pixpin-rs.json
+
+# 工具链 / 编辑器
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# AI 协作工具的工作目录（本地记忆、会话缓存）
+/.workbuddy-ai
