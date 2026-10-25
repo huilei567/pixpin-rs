@@ -8,6 +8,7 @@
 pub mod diag;
 pub mod icons;
 
+#[cfg(windows)]
 pub mod win32;
 
 #[cfg(not(windows))]
