@@ -200,6 +200,17 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           key: linux
+      # xattr 0.2.3 在新版 libc 的 linux 目标上引用了不存在的 ENOATTR
+      # （linux 的等价物是 ENODATA），官方从 0.2.3 直接跳到 1.0.0 没有修复版。
+      # gpui 的依赖锁死在 0.2.3，所以这里在 runner 上就地修源码。
+      - name: 修复 xattr 0.2.3 的 ENOATTR 编译错误
+        run: |
+          cargo fetch
+          XATTR_DIR=$(ls -d ~/.cargo/registry/src/*/xattr-0.2.3 | head -1)
+          if [ -n "$XATTR_DIR" ]; then
+            sed -i 's/::libc::ENOATTR/::libc::ENODATA/g' "$XATTR_DIR/src/sys/mod.rs"
+            echo "patched: $XATTR_DIR/src/sys/mod.rs"
+          fi
       - name: 编译
         run: cargo build --release --locked
       - name: 便携 tar.gz
