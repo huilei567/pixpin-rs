@@ -1,0 +1,13 @@
+[package]
+name = "pixocr"
+version = "0.1.0"
+edition = "2021"
+description = "Local OCR engine in Rust: DBNet detection + CTC recognition + rule-based layout"
+
+[dependencies]
+ort = { version = "=2.0.0-rc.12", features = ["api-23"] }
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "bmp"] }
+anyhow = "1"
+
+[dev-dependencies]
+ab_glyph = "0.2"
