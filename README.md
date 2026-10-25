@@ -285,18 +285,21 @@ RegisterHotKey ──WM_HOTKEY──▶ app::commands::start_capture
 
 | 平台 | 产物 | 状态 |
 |---|---|---|
-| Windows x64 | `PixPin-RS-portable-vX.Y.Z.zip`（便携版）+ `PixPin-RS-Setup-vX.Y.Z.exe`（NSIS 安装包） | ✅ 可用 |
-| macOS | `.app` + `.dmg` | ⏸ 见下 |
-| Linux | `.tar.gz` + `.deb` | ⏸ 见下 |
+| Windows x64 | `PixPin-RS-portable-vX.Y.Z.zip`（便携版）+ `PixPin-RS-Setup-vX.Y.Z.exe`（NSIS 安装包） | ✅ 完整可用 |
+| macOS | `.app` + `.dmg` | ⚠️ 能编译能安装，抓屏/托盘/热键为桩实现 |
+| Linux | `.tar.gz` + `.deb` | ⚠️ 同上 |
 
-**macOS / Linux 为什么是关闭的**：`platform/` 整个目录是 Win32 实现（GDI 抓屏、`Shell_NotifyIconW` 托盘、`RegisterHotKey` 热键、`EnumWindows` 窗口吸附），换平台等于重写这一层。UI 层用的 GPUI 本身是三平台支持的，所以移植是可行的，但需要：
+**Linux / macOS 的现状（v0.5.3 起）**：`platform/` 层拆成了 `win32/`（现有实现）和
+`stub.rs`（unix 桩，签名一致），两个平台的 CI job 已启用、Release 会带上三平台产物——
+应用能编译、能安装、能启动，但抓屏 / 托盘 / 全局热键这三样系统能力在桩实现下不可用
+（运行时会明确提示）。完整移植需要：
 
 - 抓屏 → `xcap`（macOS / X11）替换 GDI
 - 托盘 → `tray-icon` 替换 `Shell_NotifyIconW`
 - 热键 → `global-hotkey` 替换 `RegisterHotKey`
 - 窗口吸附 / 置顶 / 拖动 → 各平台原生 API
 
-工作流里这两个 job 已经写好了完整的构建 + 打包步骤，用仓库变量 `ENABLE_UNIX_BUILDS=true` 就能打开——移植完成前打开会编译失败。目前的诚实说法是：**这个项目现在只支持 Windows。**
+替换点全部集中在 `platform/` 层内，`core` / `ui` / `app` 不用动。
 
 ---
 
