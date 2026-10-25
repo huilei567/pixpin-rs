@@ -187,7 +187,8 @@ jobs:
 
   linux:
     name: Linux（功能受限：抓屏/托盘/热键未接入）
-    runs-on: ubuntu-22.04
+    # 24.04：ort-sys 预编译的 onnxruntime 需要 glibc 2.38+（__isoc23_* 符号）
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - name: 安装 GPUI 需要的系统库
