@@ -101,7 +101,7 @@ jobs:
           $exe = "dist/$env:APP_NAME/$env:APP_NAME.exe"
           $where = & $exe --where
           $where
-          if ($where -notmatch "screenshots") { throw "便携模式没有生效" }
+          if (-not ($where -match "screenshots")) { throw "便携模式没有生效" }
 
       - uses: actions/upload-artifact@v4
         with:
