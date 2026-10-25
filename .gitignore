@@ -17,3 +17,8 @@ pixpin-rs.json
 
 # AI 协作工具的工作目录（本地记忆、会话缓存）
 /.workbuddy-ai
+jobs.json
+runs.json
+linux*.log
+macos*.log
+t-*.py
