@@ -61,8 +61,19 @@ pub fn cursor_pos() -> (i32, i32) {
     (pt.x, pt.y)
 }
 
-/// Capture the monitor that currently contains the mouse cursor.
-pub fn capture_cursor_monitor() -> Result<Shot, String> {
+/// 光标所在显示器的几何信息（不抓屏）。
+///
+/// 单独拆出来是给「合成背景」用的：演示截图需要和真实抓屏一样的面板尺寸、
+/// 原点和 DPI 比例，但像素内容由程序自己画，不去碰桌面。
+pub struct MonitorGeom {
+    pub width: u32,
+    pub height: u32,
+    pub origin_x: i32,
+    pub origin_y: i32,
+    pub scale: f32,
+}
+
+pub fn cursor_monitor_geometry() -> Result<MonitorGeom, String> {
     let (cx, cy) = cursor_pos();
     let pt = POINT { x: cx, y: cy };
 
@@ -89,6 +100,23 @@ pub fn capture_cursor_monitor() -> Result<Shot, String> {
         let _ = GetDpiForMonitor(monitor, MDT_EFFECTIVE_DPI, &mut dpi_x, &mut dpi_y);
         let scale = if dpi_x == 0 { 1.0 } else { dpi_x as f32 / 96.0 };
 
+        Ok(MonitorGeom {
+            width,
+            height,
+            origin_x: rect.left,
+            origin_y: rect.top,
+            scale,
+        })
+    }
+}
+
+/// Capture the monitor that currently contains the mouse cursor.
+pub fn capture_cursor_monitor() -> Result<Shot, String> {
+    let geom = cursor_monitor_geometry()?;
+    let (width, height) = (geom.width, geom.height);
+    let (rect_left, rect_top) = (geom.origin_x, geom.origin_y);
+
+    unsafe {
         let screen_dc = GetDC(None);
         if screen_dc.is_invalid() {
             return Err("GetDC failed".into());
@@ -115,8 +143,8 @@ pub fn capture_cursor_monitor() -> Result<Shot, String> {
             width as i32,
             height as i32,
             Some(screen_dc),
-            rect.left,
-            rect.top,
+            rect_left,
+            rect_top,
             rop,
         );
 
@@ -157,9 +185,9 @@ pub fn capture_cursor_monitor() -> Result<Shot, String> {
             width,
             height,
             bgra,
-            origin_x: rect.left,
-            origin_y: rect.top,
-            scale,
+            origin_x: rect_left,
+            origin_y: rect_top,
+            scale: geom.scale,
         })
     }
 }

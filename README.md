@@ -2,7 +2,7 @@
 
 > 用 **Rust + GPUI** 复刻 PixPin 的截图工作流：全局热键 → 冻结屏幕 → 框选 → 标注 → 复制 / 保存 / 贴图 / 取字。
 >
-> Windows 桌面工具，约 8300 行 Rust，32 个源文件，单 crate 五层结构。
+> Windows 桌面工具，约 8600 行 Rust，32 个源文件，单 crate 五层结构。
 
 <p align="center">
   <img src="assets/icons/icon.png" width="96" alt="PixPin-RS">
@@ -22,6 +22,10 @@
 
 ## 软件截图
 
+> 下面这些图全部由程序自己生成：底图是 `--demo-bg` 合成的空白画布（纯白 + 极淡网格），
+> 界面由 `--shot-window` 走 `PrintWindow` 抓真实窗口。没有一张是手工摆拍，
+> 也没有一张带出桌面上的私人内容。
+
 **截图与标注**（冻结屏幕 + 框选 + 八向手柄 + 放大镜取色 + 矢量工具栏）
 
 ![覆盖层](assets/screenshots/overlay.png)
@@ -30,19 +34,19 @@
 
 ![工具栏](assets/screenshots/toolbar.png)
 
-**标注导出效果**（矩形 / 箭头 / 画笔 / 马赛克，软件栅格化，画笔带抗锯齿）
+**标注导出效果**（矩形 / 椭圆 / 画笔 / 箭头 / 文字，走 `core::raster` 软件栅格化，画笔带抗锯齿）
 
 ![导出效果](assets/screenshots/export-demo.png)
 
-**取字结果窗口**（拖拽选择 / 双击选词 / 右键菜单）
+**取字结果窗口**（拖拽选择 / 双击选词 / 三击选行 / 右键菜单）
 
 ![取字](assets/screenshots/ocr-window.png)
 
-**托盘菜单**
+**托盘菜单**（原生 `TrackPopupMenu`，左键截图、右键出菜单）
 
 ![托盘](assets/screenshots/tray-menu.png)
 
-**贴图窗口**（钉在屏幕上，蓝框是窗口边界；这张是自测用的渐变色块，专门用来验证置顶、拖动和滚轮缩放）
+**贴图窗口**（把上面那张标注样张钉在屏幕上，蓝框是窗口边界；右键菜单里有「编辑标注 / 提取文字 / 复制 / 保存 / 缩放」）
 
 ![贴图](assets/screenshots/pin-window.png)
 
@@ -161,6 +165,23 @@ PixPin-RS.exe --icon-export a.ico  # 重新生成多尺寸图标
 PixPin-RS.exe --trace              # 关键事件写进 pixpin-trace.log
 ```
 
+还有一组是专门给 README 出图用的，不参与正常流程：
+
+```bash
+# 空白底图：用程序生成的画布代替真实抓屏，尺寸/原点/DPI 和真抓屏一致
+PixPin-RS.exe --selftest --no-tray --demo-bg
+
+# 抓窗口：PrintWindow 到 DIB，按客户区裁掉 DWM 的不可见边框
+#   参数：输出 类名 序号(按面积降序) window|client printwindow-flags
+PixPin-RS.exe --shot-window overlay.png Zed::Window 0 client 2
+PixPin-RS.exe --shot-window tray.png "#32768" 0 window 0   # 原生菜单要 0
+
+PixPin-RS.exe --pin-test out.png   # 贴图窗口：把指定图片钉在屏幕上
+PixPin-RS.exe --tray-menu          # 让托盘弹出右键菜单（投 WM_TRAY）
+```
+
+`--demo-bg` 的意义不只是「图好看」：截图里不会带出桌面上的私人内容，而且换台机器、换个分辨率也能复现出同一张图。
+
 ---
 
 ## 架构说明
@@ -194,8 +215,8 @@ src/
 ├── main.rs                    15    只声明模块 + 调 app::run()
 ├── app/
 │   ├── bootstrap.rs          177    单实例、隐藏控制台、常驻窗口、热键/托盘轮询
-│   ├── commands.rs           167    用例：截图 / 打开设置 / 贴图再编辑 / 托盘命令分发
-│   └── cli.rs                471    自测开关、输入注入工具、无窗口子命令
+│   ├── commands.rs           173    用例：截图 / 打开设置 / 贴图再编辑 / 托盘命令分发
+│   └── cli.rs                742    自测开关、输入注入、窗口截图、无窗口子命令
 ├── core/
 │   ├── geom.rs                58    RectF
 │   ├── annotation.rs         260    Shape 枚举、命中测试、箭头几何、HSV 互转、轨迹平滑
@@ -205,7 +226,7 @@ src/
 │   ├── ocr.rs                 37    OCR 引擎全局单例 + 懒加载
 │   └── paths.rs               21    保存目录（portable.txt 决定）
 ├── platform/
-│   ├── capture.rs            165    GDI BitBlt 抓屏，产出 Shot（BGRA）
+│   ├── capture.rs            193    GDI BitBlt 抓屏 + 显示器几何，产出 Shot（BGRA）
 │   ├── tray.rs               469    Shell_NotifyIconW + 现画 32×32 图标
 │   ├── hotkey.rs              62    RegisterHotKey + 消息泵
 │   ├── winpick.rs            145    光标下的窗口枚举（吸附用）

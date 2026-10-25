@@ -132,17 +132,34 @@ exe 是 console 子系统，双击时 Windows 会给它配一个黑色控制台�
 `pressed_button` 也行）；右键菜单用普通 div 浮层时，后面的行会画在浮层之上，
 要么把浮层挂到容器末尾、要么 `.occlude()` 挡住底层 hitbox。
 
+**27. 屏幕 BitBlt 抓不到自己的窗口，但 `PrintWindow` 可以。**
+GPUI 在 Windows 上走 DirectComposition，GDI 的屏幕 BitBlt 拿到的是黑块；
+对目标 HWND 调 `PrintWindow(hwnd, hdc, PW_RENDERFULLCONTENT=2)` 就能拿到完整内容。
+两个细节：`PrintWindow` 在 windows crate 里挂在 `Win32_Storage_Xps` feature 下
+（为一个开发期函数多开 feature 不划算，直接 `#[link(name="user32")]` 声明）；
+原生菜单（类名 `#32768`）必须传 flags=0 走 WM_PRINT 那条老路，传 2 只会画出第一项。
+
+**28. 无边框窗口的 HWND 比看得见的区域大一圈。**
+DWM 给每个顶层窗口都留了不可见的缩放边框（这机器上是左右各 11px、底部 11px），
+`PrintWindow` 会把它拍成黑边，而且黑边**不在最外一列**（外面还有 1px 高光），
+所以按「逐行逐列裁纯黑」永远裁不掉。正确做法是拿 `GetClientRect` +
+`ClientToScreen` 算出客户区相对窗口的偏移，直接按客户区裁；想连标题栏一起要，
+就从窗口顶部裁到客户区底部。
+
 ## 验收记录
 
-- `assets/screenshots/overlay.png` —— 覆盖层实拍：遮罩、白框 + 八手柄、尺寸徽标、四种标注、图标工具栏、放大镜
-- `assets/screenshots/toolbar.png` —— 工具栏 1:1 实拍：五个标注工具 + 分隔线 + 七个动作，撤销/重做置灰
-- `assets/screenshots/export-demo.png` —— 导出的成品：裁剪正确、红框/黄箭头/绿画笔/马赛克栅格化正确、颜色无 R/B 反转
+> 全部截图现在都是程序自己出的：底图走 `--selftest --demo-bg` 的合成空白画布，
+> 窗口走 `--shot-window`（`PrintWindow` + 按客户区裁 DWM 边框）。
+> 好处有两个：不会把桌面上的私人内容带进公开仓库；换机器、换分辨率也能复现。
+
+- `assets/screenshots/overlay.png` —— 覆盖层实拍：遮罩、白框 + 八手柄、尺寸徽标、标注、图标工具栏、放大镜取色（读数是 `#FFFFFF`，正好证明底图是空白画布）
+- `assets/screenshots/toolbar.png` —— 工具栏 1:1 裁剪：五个标注工具 + 分隔线 + 七个动作，撤销/重做置灰
+- `assets/screenshots/export-demo.png` —— `--selftest` 导出的成品：裁剪正确，红框/蓝椭圆/绿画笔/黄箭头/文字栅格化正确，颜色无 R/B 反转
 - `assets/icons/icon.png` —— 托盘图标 8 倍放大：蓝色圆角方块 + 白色取景角标，配色正确
-- （托盘溢出区实拍 `tray-flyout.png` 已归档，未随仓库保留）
-- `assets/screenshots/tray-menu.png` —— 右键菜单：截图 / 显示主窗口 / 退出
-- `assets/screenshots/pin-window.png` —— 贴图窗口（蓝框是窗口边界）；内容是自测用的渐变色块，专门验证置顶、拖动和滚轮缩放
-- `assets/screenshots/ocr-window.png` —— 取字结果窗口：三段正文按段落还原，页脚提示已复制到剪贴板
-- （设置窗口截图 `settings-window.png` 当时截错了内容，已删除，待重拍）
+- `assets/screenshots/tray-menu.png` —— 原生右键菜单：截图 / 设置… / 退出（`PrintWindow` 对菜单要传 flags=0，传 2 只会画出第一项）
+- `assets/screenshots/pin-window.png` —— 贴图窗口：把标注样张钉在屏幕上，蓝框是窗口边界；测试窗口按 DPI 反算尺寸，图严格 1:1
+- `assets/screenshots/ocr-window.png` —— 取字结果窗口：标题栏 + 三段正文 + 页脚提示
+- （托盘溢出区实拍 `tray-flyout.png`、设置窗口 `settings-window.png` 已归档，未随仓库保留）
 
 ## 手工验收清单
 

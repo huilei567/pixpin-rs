@@ -327,59 +327,59 @@ impl Overlay {
         };
 
         if selftest {
-            let sel = RectF::new(lw * 0.16, lh * 0.20, lw * 0.42, lh * 0.40);
+            // 演示样张：一张居中的大选区 + 六种标注各来一个，位置按比例摆，
+            // 换分辨率也不会跑偏。README 的截图就是这套形状导出来的。
+            let sel = RectF::new(lw * 0.13, lh * 0.15, lw * 0.56, lh * 0.54);
+            let (w, h) = (sel.w, sel.h);
+            let at = |fx: f32, fy: f32| (sel.x + w * fx, sel.y + h * fy);
             this.sel = Some(sel);
             this.tool = Tool::Rect;
             this.shapes = vec![
+                Shape::Text {
+                    pos: at(0.03, 0.02),
+                    text: "PIXPIN-RS 文本".into(),
+                    color: 0xFF3B30,
+                    size: 20.0,
+                    w: 170.0,
+                },
                 Shape::Rect {
-                    a: (sel.x + 40.0, sel.y + 40.0),
-                    b: (sel.right() - 60.0, sel.bottom() - 90.0),
+                    a: at(0.03, 0.11),
+                    b: at(0.40, 0.43),
                     color: 0xFF3B30,
                     width: 3.0,
                 },
-                Shape::Arrow {
-                    a: (sel.x + 90.0, sel.bottom() - 60.0),
-                    b: (sel.right() - 140.0, sel.y + 70.0),
-                    color: 0xFFCC00,
-                    width: 4.0,
+                Shape::Ellipse {
+                    a: at(0.48, 0.11),
+                    b: at(0.92, 0.43),
+                    color: 0x0A84FF,
+                    width: 3.0,
                 },
                 Shape::Pen {
                     pts: (0..30)
                         .map(|i| {
                             let t = i as f32 / 29.0;
                             (
-                                sel.x + 60.0 + t * 260.0,
-                                sel.y + sel.h * 0.5 + (t * 9.0).sin() * 26.0,
+                                sel.x + w * (0.04 + t * 0.46),
+                                sel.y + h * 0.62 + (t * 7.5).sin() * h * 0.055,
                             )
                         })
                         .collect(),
                     color: 0x34C759,
                     width: 5.0,
                 },
-                Shape::Mosaic {
-                    a: (sel.right() - 220.0, sel.y + 30.0),
-                    b: (sel.right() - 40.0, sel.y + 110.0),
-                    block: 9.0,
-                },
+                // 深色文字：导出后能看出字形渲染，也说明文字是矢量落定的
                 Shape::Text {
-                    pos: (sel.x + 30.0, sel.y + 16.0),
-                    text: "PIXPIN-RS 文本".into(),
-                    color: 0xFF3B30,
-                    size: 18.0,
-                    w: 150.0,
+                    pos: at(0.55, 0.60),
+                    text: "标注所见即所得".into(),
+                    color: 0x1C1C1E,
+                    size: 22.0,
+                    w: 200.0,
                 },
-                Shape::MosaicStroke {
-                    pts: (0..12)
-                        .map(|i| {
-                            let t = i as f32 / 11.0;
-                            (
-                                sel.x + 80.0 + t * 200.0,
-                                sel.bottom() - 90.0 + (t * 5.0).sin() * 14.0,
-                            )
-                        })
-                        .collect(),
-                    radius: 18.0,
-                    block: 9.0,
+                Shape::Arrow {
+                    a: at(0.58, 0.90),
+                    b: at(0.90, 0.68),
+                    color: 0xFFCC00,
+                    width: 4.0,
                 },
             ];
             this.record();

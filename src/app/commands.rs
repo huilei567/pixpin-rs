@@ -47,7 +47,13 @@ pub fn start_capture(cx: &mut gpui::App) {
     std::thread::sleep(Duration::from_millis(220));
     winutil::hide_own_windows();
 
-    let shot = match capture::capture_cursor_monitor() {
+    // `--demo-bg` 用程序生成的空白画布代替真实抓屏，专门给 README 出图。
+    let grabbed = if cli::demo_bg() {
+        cli::demo_shot()
+    } else {
+        capture::capture_cursor_monitor()
+    };
+    let shot = match grabbed {
         Ok(shot) => Arc::new(shot),
         Err(err) => {
             eprintln!("[pixpin-rs] capture failed: {err}");

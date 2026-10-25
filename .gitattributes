@@ -1,0 +1,10 @@
+# 统一换行：仓库里一律 LF，Windows 检出也不转 CRLF，
+# 免得 CI 在 Linux 上跑 rustfmt --check 时因为换行符报差异。
+* text=auto eol=lf
+
+# 二进制资源，别做任何换行/文本处理
+*.png binary
+*.ico binary
+*.onnx binary
+*.exe binary
+*.dll binary
