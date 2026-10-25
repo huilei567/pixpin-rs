@@ -382,6 +382,7 @@ fn list_app_windows() {    use windows::core::BOOL;
 
 // user32!PrintWindow。windows crate 把它挂在 Win32_Storage_Xps feature 下，
 // 为了一个开发期函数给发布版多开一个 feature 不划算，这里直接声明。
+#[cfg(windows)]
 #[link(name = "user32")]
 extern "system" {
     fn PrintWindow(hwnd: isize, hdc: isize, flags: u32) -> i32;
