@@ -8,7 +8,7 @@ pub const UNIMPLEMENTED: &str =
     "此能力目前仅 Windows 可用（抓屏/托盘/热键的跨平台实现尚未接入）";
 
 pub mod capture {
-    pub use super::{MonitorGeom, Shot};
+    pub use crate::platform::{MonitorGeom, Shot};
     use super::UNIMPLEMENTED;
 
     pub fn capture_cursor_monitor() -> Result<Shot, String> {
@@ -39,7 +39,7 @@ pub mod hotkey {
 }
 
 pub mod tray {
-    pub use super::TrayCommand;
+    pub use crate::platform::TrayCommand;
     use super::UNIMPLEMENTED;
     use std::sync::mpsc::Sender;
 
@@ -54,7 +54,7 @@ pub mod tray {
 }
 
 pub mod winpick {
-    pub use super::WinRect;
+    pub use crate::platform::WinRect;
     use super::UNIMPLEMENTED;
 
     pub fn window_at(_px: i32, _py: i32) -> Option<WinRect> {
