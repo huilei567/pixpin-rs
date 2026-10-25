@@ -1,6 +1,6 @@
 [package]
 name = "pixpin-rs"
-version = "0.5.3"
+version = "0.0.1"
 edition = "2021"
 description = "A PixPin-like screenshot, annotation & OCR tool built with Rust + GPUI"
 license = "Apache-2.0"

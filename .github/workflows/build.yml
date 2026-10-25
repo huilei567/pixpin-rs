@@ -177,6 +177,23 @@ jobs:
       - name: 发布 Release
         uses: softprops/action-gh-release@v2
         with:
+          name: PixPin-RS ${{ github.ref_name }}
+          body: |
+            PixPin-RS 跨平台构建：Windows / Linux / macOS。
+
+            ## 下载建议
+            - **Windows**：便携版 zip（解压即用）或 NSIS 安装包
+            - **Linux**：`.deb`（Debian/Ubuntu）或 `.tar.gz`
+            - **macOS**：`.dmg`（Apple Silicon）
+
+            ## 功能
+            全局热键截屏、窗口识别、放大镜取色；矩形 / 椭圆 / 画笔 / 箭头 /
+            马赛克（框选 + 涂抹）/ 文本标注；HSV 取色盘与滑杆连续调节；
+            离线 OCR 取字（DBNet + PP-OCRv5）；贴图；右键拖拽擦除；快照式撤销。
+
+            ## 平台说明
+            Windows 功能完整；Linux / macOS 能安装能启动，但抓屏 / 托盘 /
+            全局热键暂为桩实现（完整移植在路线图里）。
           files: |
             dist/*.zip
             dist/*-Setup-*.exe
@@ -212,6 +229,12 @@ jobs:
             sed -i 's/::libc::ENOATTR/::libc::ENODATA/g' "$XATTR_DIR/src/sys/mod.rs"
             echo "patched: $XATTR_DIR/src/sys/mod.rs"
           fi
+      - name: 读取版本号
+        id: version
+        run: |
+          v=$(sed -n 's/^version = "\(.*\)"//p' Cargo.toml | head -1)
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+          echo "version = $v"
       - name: 编译
         run: cargo build --release --locked
       - name: 便携 tar.gz
@@ -219,12 +242,13 @@ jobs:
           mkdir -p dist/PixPin-RS
           cp target/release/pixpin-rs dist/PixPin-RS/
           cp -r models dist/PixPin-RS/
-          tar -C dist -czf dist/PixPin-RS-linux-x86_64.tar.gz PixPin-RS
+          tar -C dist -czf "dist/PixPin-RS-linux-x86_64-v${{ steps.version.outputs.version }}.tar.gz" PixPin-RS
       - name: 打 deb
         run: |
           PKG=dist/deb/pixpin-rs
           mkdir -p "$PKG/DEBIAN" "$PKG/usr/bin" "$PKG/usr/share/pixpin-rs/models" \
                    "$PKG/usr/share/icons/hicolor/256x256/apps"
+          sed -i "s/^Version: 0.0.0/Version: ${{ steps.version.outputs.version }}/" "$PKG/DEBIAN/control"
           cp target/release/pixpin-rs "$PKG/usr/bin/pixpin-rs"
           cp models/* "$PKG/usr/share/pixpin-rs/models/"
           cp assets/icons/icon.png "$PKG/usr/share/icons/hicolor/256x256/apps/pixpin-rs.png"
@@ -237,7 +261,7 @@ jobs:
           Maintainer: PixPin-RS
           Description: Screenshot, annotation and OCR tool built with Rust + GPUI.
           CTRL
-          dpkg-deb --build "$PKG" dist/PixPin-RS-linux-amd64.deb
+          dpkg-deb --build "$PKG" "dist/PixPin-RS-linux-amd64-v${{ steps.version.outputs.version }}.deb"
       - uses: actions/upload-artifact@v4
         with:
           name: pixpin-rs-linux
