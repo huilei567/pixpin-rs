@@ -232,7 +232,7 @@ jobs:
       - name: 读取版本号
         id: version
         run: |
-          v=$(sed -n 's/^version = "\(.*\)"//p' Cargo.toml | head -1)
+          v=$(sed -n 's/^version = "(.*)"/\1/p' Cargo.toml | head -1)
           echo "version=$v" >> "$GITHUB_OUTPUT"
           echo "version = $v"
       - name: 编译
@@ -248,7 +248,6 @@ jobs:
           PKG=dist/deb/pixpin-rs
           mkdir -p "$PKG/DEBIAN" "$PKG/usr/bin" "$PKG/usr/share/pixpin-rs/models" \
                    "$PKG/usr/share/icons/hicolor/256x256/apps"
-          sed -i "s/^Version: 0.0.0/Version: ${{ steps.version.outputs.version }}/" "$PKG/DEBIAN/control"
           cp target/release/pixpin-rs "$PKG/usr/bin/pixpin-rs"
           cp models/* "$PKG/usr/share/pixpin-rs/models/"
           cp assets/icons/icon.png "$PKG/usr/share/icons/hicolor/256x256/apps/pixpin-rs.png"
@@ -261,6 +260,7 @@ jobs:
           Maintainer: PixPin-RS
           Description: Screenshot, annotation and OCR tool built with Rust + GPUI.
           CTRL
+          sed -i "s/^Version: 0.0.0/Version: ${{ steps.version.outputs.version }}/" "$PKG/DEBIAN/control"
           dpkg-deb --build "$PKG" "dist/PixPin-RS-linux-amd64-v${{ steps.version.outputs.version }}.deb"
       - uses: actions/upload-artifact@v4
         with:
