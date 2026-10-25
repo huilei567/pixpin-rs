@@ -76,6 +76,7 @@ pub fn get() -> Config {
 
 const RUN_KEY: &str = "Software\\Microsoft\\Windows\\CurrentVersion\\Run";
 
+#[cfg(windows)]
 pub fn autostart_enabled() -> bool {
     use windows::core::HSTRING;
     use windows::Win32::System::Registry::{
@@ -101,6 +102,7 @@ pub fn autostart_enabled() -> bool {
 }
 
 /// 写入/删除 `HKCU\...\Run\PixPin-RS`。返回错误文案给设置界面提示。
+#[cfg(windows)]
 pub fn set_autostart(on: bool) -> Result<(), String> {
     use windows::Win32::System::Registry::{
         RegCloseKey, RegDeleteValueW, RegOpenKeyExW, RegSetValueExW, HKEY, HKEY_CURRENT_USER,
@@ -134,4 +136,15 @@ pub fn set_autostart(on: bool) -> Result<(), String> {
             Err("写入注册表失败".into())
         }
     }
+}
+
+/// 非 Windows：开机自启暂未实现（注册表是 Win32 能力）。
+#[cfg(not(windows))]
+pub fn autostart_enabled() -> bool {
+    false
+}
+
+#[cfg(not(windows))]
+pub fn set_autostart(_on: bool) -> Result<(), String> {
+    Err("开机自启目前仅 Windows 支持".into())
 }

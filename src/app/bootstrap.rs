@@ -91,13 +91,13 @@ fn start_background_services(cx: &mut gpui::App) {
             .timer(Duration::from_millis(40))
             .await;
 
-        let mut queued: Vec<tray::TrayCommand> = Vec::new();
+        let mut queued: Vec<crate::platform::TrayCommand> = Vec::new();
         while let Ok(cmd) = tray_rx.try_recv() {
             queued.push(cmd);
         }
         if flag.swap(false, Ordering::SeqCst) {
             diag::trace("poller: hotkey flag picked up");
-            queued.push(tray::TrayCommand::Capture);
+            queued.push(crate::platform::TrayCommand::Capture);
         }
         if queued.is_empty() {
             continue;

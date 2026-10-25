@@ -40,6 +40,7 @@ fn append(line: &str) {
     eprintln!("[pixpin-rs] {line}");
 }
 
+#[cfg(windows)]
 fn module_of(addr: usize) -> String {
     unsafe {
         let mut hmod = HMODULE::default();

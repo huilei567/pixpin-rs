@@ -162,12 +162,12 @@ pub fn open_settings(cx: &mut gpui::App) {
     settings::open(cx, start_capture_from_settings);
 }
 
-pub fn handle_tray_command(cmd: tray::TrayCommand, cx: &mut gpui::App) {
+pub fn handle_tray_command(cmd: crate::platform::TrayCommand, cx: &mut gpui::App) {
     eprintln!("[pixpin-rs] tray command: {cmd:?}");
     diag::trace(&format!("tray command: {cmd:?}"));
     match cmd {
-        tray::TrayCommand::Capture => start_capture(cx),
-        tray::TrayCommand::Settings => open_settings(cx),
-        tray::TrayCommand::Quit => cx.quit(),
+        crate::platform::TrayCommand::Capture => start_capture(cx),
+        crate::platform::TrayCommand::Settings => open_settings(cx),
+        crate::platform::TrayCommand::Quit => cx.quit(),
     }
 }
