@@ -320,4 +320,9 @@ src/                源码
 
 ## 许可
 
-代码用于学习和自用。PixPin 是 [PixPin](https://pixpin.cn) 的产品，本项目只是照着它的交互复刻，与其无关。
+[Apache-2.0](LICENSE)。PixPin 是 [PixPin](https://pixpin.cn) 的产品，本项目只是照着它的交互复刻，与其无关。
+
+第三方组件：UI 框架 [GPUI](https://crates.io/crates/gpui)（Apache-2.0）、推理框架
+[ort / ONNX Runtime](https://github.com/pykeio/ort)（MIT / Apache-2.0）、OCR 模型
+PP-OCRv5 来自 [RapidAI/RapidOCR](https://github.com/RapidAI/RapidOCR)（Apache-2.0），
+各依赖的完整清单见 `Cargo.toml`。
