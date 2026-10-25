@@ -111,6 +111,7 @@ fn start_background_services(cx: &mut gpui::App) {
     .detach();
 }
 
+#[cfg(windows)]
 fn already_running() -> bool {
     use windows::core::w;
     use windows::Win32::Foundation::{GetLastError, ERROR_ALREADY_EXISTS};
@@ -134,6 +135,16 @@ fn already_running() -> bool {
 /// parks itself on top of the screen and takes the foreground. That is the
 /// direct cause of "the hotkey does nothing until I click the tray icon" — the
 /// overlay did open, it just opened behind the console.
+#[cfg(not(windows))]
+fn already_running() -> bool {
+    // 非 Windows：单实例互斥锁是 Win32 实现，桩阶段直接放行
+    false
+}
+
+#[cfg(not(windows))]
+fn hide_own_console() {}
+
+#[cfg(windows)]
 fn hide_own_console() {
     use windows::Win32::System::Console::{FreeConsole, GetConsoleProcessList};
     unsafe {

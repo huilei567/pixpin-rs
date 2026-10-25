@@ -9,11 +9,15 @@ use std::io::Write;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 
+#[cfg(windows)]
 use windows::core::PCWSTR;
+#[cfg(windows)]
 use windows::Win32::Foundation::HMODULE;
+#[cfg(windows)]
 use windows::Win32::System::Diagnostics::Debug::{
     SetUnhandledExceptionFilter, EXCEPTION_CONTINUE_SEARCH, EXCEPTION_POINTERS,
 };
+#[cfg(windows)]
 use windows::Win32::System::LibraryLoader::{
     GetModuleFileNameW, GetModuleHandleExW, GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS,
     GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
@@ -56,6 +60,7 @@ fn module_of(addr: usize) -> String {
     }
 }
 
+#[cfg(windows)]
 unsafe extern "system" fn filter(info: *const EXCEPTION_POINTERS) -> i32 {
     if !info.is_null() {
         let rec = (*info).ExceptionRecord;
@@ -79,7 +84,10 @@ pub fn install() {
         prev(p);
     }));
     unsafe {
+        #[cfg(windows)]
         SetUnhandledExceptionFilter(Some(filter));
+        #[cfg(not(windows))]
+        eprintln!("[pixpin-rs] crash filter: 仅 Windows 支持 SEH，非 Windows 平台跳过");
     }
 }
 

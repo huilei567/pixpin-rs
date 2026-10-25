@@ -111,15 +111,6 @@ jobs:
             dist/*-Setup-*.exe
           if-no-files-found: error
 
-      - name: 发布 Release
-        if: startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v2
-        with:
-          files: |
-            dist/*.zip
-            dist/*-Setup-*.exe
-          generate_release_notes: true
-
   # ---------------------------------------------------------------------------
   # macOS / Linux：默认关闭
   #
@@ -135,8 +126,7 @@ jobs:
   # 现在打开会编译失败（windows crate 只在 Windows 上可用）。
   # ---------------------------------------------------------------------------
   macos:
-    name: macOS（未移植，默认关闭）
-    if: vars.ENABLE_UNIX_BUILDS == 'true'
+    name: macOS（功能受限：抓屏/托盘/热键未接入）
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
@@ -174,9 +164,29 @@ jobs:
           path: dist/*.dmg
           if-no-files-found: error
 
+  release:
+    name: 发布 Release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [windows, macos, linux]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+          path: dist
+      - name: 发布 Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/*.zip
+            dist/*-Setup-*.exe
+            dist/*.tar.gz
+            dist/*.deb
+            dist/*.dmg
+          generate_release_notes: true
+
   linux:
-    name: Linux（未移植，默认关闭）
-    if: vars.ENABLE_UNIX_BUILDS == 'true'
+    name: Linux（功能受限：抓屏/托盘/热键未接入）
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4

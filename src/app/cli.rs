@@ -15,7 +15,7 @@ use gpui::{
 };
 
 use crate::app::commands;
-use crate::platform::{capture, tray, winutil};
+use crate::platform::{capture, winutil};
 use crate::services::{ocr, paths};
 use crate::ui::{pin, text_result};
 
@@ -234,6 +234,7 @@ pub fn schedule_startup_tests(cx: &mut App) {
     .detach();
 }
 
+#[cfg(windows)]
 fn simulate_drag(x0: i32, y0: i32, x1: i32, y1: i32, right: bool) {
     use windows::Win32::UI::Input::KeyboardAndMouse::{
         mouse_event, MOUSEEVENTF_LEFTDOWN, MOUSEEVENTF_LEFTUP, MOUSEEVENTF_RIGHTDOWN,
@@ -268,6 +269,7 @@ fn simulate_drag(x0: i32, y0: i32, x1: i32, y1: i32, right: bool) {
 /// `RegisterHotKey` matches against. The legacy `keybd_event` path is kept for
 /// comparison, because whether injected keys trip a global hotkey at all is
 /// exactly what we need to pin down when debugging "the hotkey does nothing".
+#[cfg(windows)]
 fn send_key(vk: u16, mods: &[String], modern: bool) {
     use windows::Win32::UI::Input::KeyboardAndMouse::{
         keybd_event, SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYBD_EVENT_FLAGS,
@@ -338,6 +340,7 @@ fn send_key(vk: u16, mods: &[String], modern: bool) {
 
 /// 处理所有“执行完就退出”的 CLI 命令。返回 true 表示进程不应进入事件循环。
 /// 列出所有 GPUI 顶层窗口的矩形（跨进程），自动化验证贴图缩放 / 移动用。
+#[cfg(windows)]
 fn list_app_windows() {    use windows::core::BOOL;
     use windows::Win32::Foundation::{HWND, LPARAM, RECT};
     use windows::Win32::UI::WindowsAndMessaging::{
@@ -393,6 +396,7 @@ static SHOT_CANDIDATES: Mutex<Vec<(isize, i32, i32)>> = Mutex::new(Vec::new());
 /// 传 `window` 则保留整窗（含标题栏）。最后一个是 PrintWindow 的 flags，
 /// 默认 2（PW_RENDERFULLCONTENT，抓 DirectComposition 窗口必需）；
 /// 原生菜单要传 0，否则只画出第一项。
+#[cfg(windows)]
 fn shot_window(out: &str, class: &str, index: usize, whole: bool, pw_flags: u32) -> bool {
     use windows::Win32::Foundation::{HWND, LPARAM, RECT};
     use windows::Win32::Graphics::Gdi::{
@@ -538,7 +542,14 @@ fn shot_window(out: &str, class: &str, index: usize, whole: bool, pw_flags: u32)
     true
 }
 
-pub fn run_headless(args: &[String]) -> bool {
+#[cfg(not(windows))]
+fn win32_headless(_args: &[String]) -> Option<bool> {
+    None
+}
+
+/// Windows 专属的无窗口自测开关（输入注入 / Win32 抓屏 / 托盘消息）。
+#[cfg(windows)]
+fn win32_headless(args: &[String]) -> Option<bool> {
     if args.len() >= 2 && args[1] == "--tray-menu" {
         // 给 README 拍托盘菜单：往托盘窗口投一条 WM_TRAY + WM_RBUTTONUP，
         // 等价于右键点了托盘图标。菜单是 TrackPopupMenu 弹的原生菜单，
@@ -555,7 +566,7 @@ pub fn run_headless(args: &[String]) -> bool {
             let _ = unsafe { PostMessageW(Some(hwnd), WM_TRAY, WPARAM(0), LPARAM(WM_RBUTTONUP as isize)) };
             println!("tray-menu posted");
         }
-        return true;
+        return Some(true);
     }
     if args.len() >= 3 && args[1] == "--shot-window" {
         let class = args.get(3).map(|s| s.as_str()).unwrap_or("Zed::Window");
@@ -563,7 +574,7 @@ pub fn run_headless(args: &[String]) -> bool {
         let whole = args.get(5).map(|s| s == "window").unwrap_or(false);
         // 原生菜单要 0（走 WM_PRINT），GPUI 的 DirectComposition 窗口要 2
         let pw_flags: u32 = args.get(6).and_then(|s| s.parse().ok()).unwrap_or(2);
-        return shot_window(&args[2], class, index, whole, pw_flags);
+        return Some(shot_window(&args[2], class, index, whole, pw_flags));
     }
     if args.len() >= 3 && args[1] == "--ocr-test" {
         match image::open(&args[2]) {
@@ -582,7 +593,7 @@ pub fn run_headless(args: &[String]) -> bool {
                 std::process::exit(1);
             }
         }
-        return true;
+        return Some(true);
     }
     if args.len() >= 6 && args[1] == "--drag" {
         let v: Vec<i32> = args[2..6].iter().filter_map(|s| s.parse().ok()).collect();
@@ -590,27 +601,7 @@ pub fn run_headless(args: &[String]) -> bool {
             let right = args.get(6).map(|s| s == "right").unwrap_or(false);
             simulate_drag(v[0], v[1], v[2], v[3], right);
         }
-        return true;
-    }
-    if args.len() >= 8 && args[1] == "--zoom" {
-        let n = |i: usize| args[i].parse::<u32>().unwrap_or(0);
-        let (x, y, w, h) = (n(4), n(5), n(6), n(7));
-        match image::open(&args[2]) {
-            Ok(img) => {
-                let rgba = img.to_rgba8();
-                let sub = image::imageops::crop_imm(&rgba, x, y, w, h).to_image();
-                let big = image::imageops::resize(
-                    &sub,
-                    (w * 6).max(1),
-                    (h * 6).max(1),
-                    image::imageops::FilterType::Nearest,
-                );
-                let _ = big.save(&args[3]);
-                println!("zoom -> {}", args[3]);
-            }
-            Err(e) => eprintln!("open failed: {e}"),
-        }
-        return true;
+        return Some(true);
     }
     if args.len() >= 4 && args[1] == "--move" {
         let (x, y) = (
@@ -620,7 +611,7 @@ pub fn run_headless(args: &[String]) -> bool {
         unsafe {
             let _ = windows::Win32::UI::WindowsAndMessaging::SetCursorPos(x, y);
         }
-        return true;
+        return Some(true);
     }
     if args.len() >= 4 && args[1] == "--clicks" {
         let x: i32 = args[2].parse().unwrap_or(0);
@@ -649,16 +640,11 @@ pub fn run_headless(args: &[String]) -> bool {
                 std::thread::sleep(Duration::from_millis(gap));
             }
         }
-        return true;
-    }
-    if args.len() >= 2 && args[1] == "--cursor" {
-        let (x, y) = capture::cursor_pos();
-        println!("{x},{y}");
-        return true;
+        return Some(true);
     }
     if args.len() >= 2 && args[1] == "--winlist" {
         list_app_windows();
-        return true;
+        return Some(true);
     }
     if args.len() >= 5 && args[1] == "--wheel" {
         let x: i32 = args[2].parse().unwrap_or(0);
@@ -675,12 +661,41 @@ pub fn run_headless(args: &[String]) -> bool {
                 std::thread::sleep(Duration::from_millis(70));
             }
         }
-        return true;
+        return Some(true);
     }
     if args.len() >= 3 && (args[1] == "--key" || args[1] == "--send") {
         if let Ok(vk) = args[2].parse::<u16>() {
             send_key(vk, &args[3..], args[1] == "--send");
         }
+        return Some(true);
+    }
+    None
+}
+
+pub fn run_headless(args: &[String]) -> bool {
+    if args.len() >= 8 && args[1] == "--zoom" {
+        let n = |i: usize| args[i].parse::<u32>().unwrap_or(0);
+        let (x, y, w, h) = (n(4), n(5), n(6), n(7));
+        match image::open(&args[2]) {
+            Ok(img) => {
+                let rgba = img.to_rgba8();
+                let sub = image::imageops::crop_imm(&rgba, x, y, w, h).to_image();
+                let big = image::imageops::resize(
+                    &sub,
+                    (w * 6).max(1),
+                    (h * 6).max(1),
+                    image::imageops::FilterType::Nearest,
+                );
+                let _ = big.save(&args[3]);
+                println!("zoom -> {}", args[3]);
+            }
+            Err(e) => eprintln!("open failed: {e}"),
+        }
+        return true;
+    }
+    if args.len() >= 2 && args[1] == "--cursor" {
+        let (x, y) = capture::cursor_pos();
+        println!("{x},{y}");
         return true;
     }
     if args.len() >= 2 && args[1] == "--where" {
@@ -708,13 +723,17 @@ pub fn run_headless(args: &[String]) -> bool {
         return true;
     }
     if args.len() >= 3 && args[1] == "--icon-export" {
-        std::fs::write(&args[2], tray::icon_ico_bytes()).expect("write ico");
+        std::fs::write(&args[2], crate::platform::icons::icon_ico_bytes()).expect("write ico");
         println!("ico -> {}", args[2]);
         return true;
     }
     if args.len() >= 3 && args[1] == "--icon-test" {
-        let s = tray::icon_size();
-        if let Some(img) = image::RgbaImage::from_raw(s, s, tray::icon_rgba()) {
+        let s = crate::platform::icons::icon_size();
+        if let Some(img) = image::RgbaImage::from_raw(
+            s,
+            s,
+            crate::platform::icons::icon_rgba(),
+        ) {
             let big =
                 image::imageops::resize(&img, s * 8, s * 8, image::imageops::FilterType::Nearest);
             let _ = big.save(&args[2]);
