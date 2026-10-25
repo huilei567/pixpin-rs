@@ -4006,7 +4006,7 @@ dependencies = [
 
 [[package]]
 name = "pixpin-rs"
-version = "0.5.3"
+version = "0.0.1"
 dependencies = [
  "ab_glyph",
  "anyhow",
